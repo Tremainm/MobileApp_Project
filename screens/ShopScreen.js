@@ -17,7 +17,7 @@ import {
 import BasketItem from '../components/BasketItem';
 import useBasket from '../hooks/useBasket';
 
-export default function BasketScreen({navigation}) {
+export default function ShopScreen({navigation}) {
   const { basket, loading, fetchBasketItems, deleteBasketItem, updateBasketItem } = useBasket();
 
   useEffect(() => {
