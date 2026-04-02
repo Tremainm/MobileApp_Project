@@ -1,8 +1,7 @@
 // PantryScreen
-// - Purpose: Displays the user's pantry items with category filtering.
-// - Key inputs: none (uses mock data for now — will be replaced with SQLite/context later).
+// - Purpose: Displays pantry items from SQLite via PantryContext, with category filtering.
+// - Key inputs: none - reads from PantryContext (backed by SQLite).
 // - Key outputs: category filter chips, item count, FlatList of PantryItem cards.
-// - Notes: Orchestration-only. Edit/delete handlers just log for now until persistence is wired up.
 
 import React, { useState } from 'react';
 import {
@@ -15,49 +14,24 @@ import {
 } from 'react-native';
 import { Colors } from '../constants/colors';
 import PantryItem from '../components/PantryItem';
-
-// Replace this with SQLite / context data later.
-const MOCK_ITEMS = [
-  { id: '1', name: 'Whole Milk',       category: 'Dairy',   quantity: 1,   unit: 'litre', location: 'Fridge', expiryDate: getDateFromNow(2)  },
-  { id: '2', name: 'Cheddar Cheese',   category: 'Dairy',   quantity: 500, unit: 'g',      location: 'Fridge', expiryDate: getDateFromNow(12) },
-  { id: '3', name: 'Whole Wheat Bread',category: 'Bakery',  quantity: 1,   unit: 'loaf',   location: 'Pantry',       expiryDate: getDateFromNow(5)  },
-  { id: '4', name: 'Sourdough Loaf',   category: 'Bakery',  quantity: 1,   unit: 'loaf',   location: 'Pantry',       expiryDate: getDateFromNow(-1) },
-  { id: '5', name: 'Broccoli',         category: 'Produce', quantity: 2,   unit: 'heads',  location: 'Fridge', expiryDate: getDateFromNow(3)  },
-  { id: '6', name: 'Bananas',          category: 'Produce', quantity: 6,   unit: 'pcs',    location: 'Counter',      expiryDate: getDateFromNow(6)  },
-  { id: '7', name: 'Greek Yogurt',     category: 'Dairy',   quantity: 150,   unit: 'ml',   location: 'Fridge', expiryDate: getDateFromNow(8)  },
-  { id: '8', name: 'Orange Juice',     category: 'Drinks',  quantity: 1,   unit: 'litre', location: 'Fridge', expiryDate: getDateFromNow(7)  },
-  { id: '9', name: 'Pasta',            category: 'Dry Goods',quantity: 500,unit: 'g',      location: 'Pantry',       expiryDate: getDateFromNow(180)},
-  { id: '10',name: 'Tinned Tomatoes',  category: 'Dry Goods',quantity: 3,  unit: 'cans',   location: 'Pantry',       expiryDate: null              },
-];
-
-// Helper: returns an ISO date string N days from today.
-function getDateFromNow(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-}
-
-// Derive unique categories from the data and prepend "All".
-const CATEGORIES = ['All', ...Array.from(new Set(MOCK_ITEMS.map(i => i.category)))];
+import { usePantry } from '../context/PantryContext';
 
 export default function PantryScreen({ navigation }) {
+  const { getItems, getItemsByCategory, getCategories, deletePantryItem } = usePantry();
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const filteredItems =
-    selectedCategory === 'All'
-      ? MOCK_ITEMS
-      : MOCK_ITEMS.filter(item => item.category === selectedCategory);
+  const categories = getCategories();
+  const allItems = getItems();
+  const filteredItems = getItemsByCategory(selectedCategory);
 
-  // Placeholder handlers wire up real logic once SQLite is integrated.
   function handleEdit(item) {
-    console.log('Edit pressed for:', item.name);
-    // TODO: navigate to AddScreen in edit mode, e.g.:
-    // navigation.navigate('Add', { item });
+    // Navigate to AddScreen in edit mode - passes the full item as a route param
+    navigation.navigate('Add', { item });
   }
 
   function handleDelete(id) {
-    console.log('Delete confirmed for id:', id);
-    // TODO: delete from SQLite and refresh context
+    // deletePantryItem writes to SQLite and mirrors into context state immediately
+    deletePantryItem(id);
   }
 
   function renderItem({ item }) {
@@ -82,9 +56,9 @@ export default function PantryScreen({ navigation }) {
       {/* Header */}
       <Text style={styles.header}>My Pantry</Text>
 
-      {/* Category filter chips */}
+      {/* Category filter chips - derived live from DB data */}
       <FlatList
-        data={CATEGORIES}
+        data={categories}
         keyExtractor={cat => cat}
         renderItem={renderCategoryChip}
         horizontal
@@ -95,7 +69,7 @@ export default function PantryScreen({ navigation }) {
 
       {/* Item count */}
       <Text style={styles.countText}>
-        {filteredItems.length} of {MOCK_ITEMS.length} items
+        {filteredItems.length} of {allItems.length} items
       </Text>
 
       {/* Pantry list */}
@@ -117,7 +91,6 @@ export default function PantryScreen({ navigation }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -138,13 +111,13 @@ const styles = StyleSheet.create({
   chipRow: {
     paddingHorizontal: 16,
     paddingVertical: 6,
-    gap: 8,
   },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: '#e8e8e8',
+    marginRight: 8,
   },
   chipActive: {
     backgroundColor: Colors.green,
