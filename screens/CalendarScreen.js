@@ -15,7 +15,7 @@ export default function CalendarScreen() {
 
   return (
     <ScrollView>
-      <View>
+      <View style={{ padding: 16 }}>
         <CalendarCard
           monthLabel={monthLabel}
           onPrevMonth={onPrevMonth}

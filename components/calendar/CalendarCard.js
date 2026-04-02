@@ -1,22 +1,33 @@
 import { View, Text, StyleSheet } from "react-native";
 import MonthHeader from "./MonthHeader";
 import WeekdayRow from "./WeekdayRow";
+import DaysGrid from "./DaysGrid";
 
 
 export default function CalendarCard({
   monthLabel,
   onPrevMonth,
   onNextMonth,
+  days,
+  selectedDate,
+  onSelectDate,
+  deliveryDates,
 }) {
   return (
     <View style={styles.calendarCard}>
-      <Text style={styles.sectionTitle}>Delivery Schedule</Text>
+      <Text style={styles.sectionTitle}>Expiry Calendar</Text>
       <MonthHeader
         monthLabel={monthLabel}
         onPrev={onPrevMonth}
         onNext={onNextMonth} 
       />
       <WeekdayRow />
+      <DaysGrid
+        days={days}
+        selectedDate={selectedDate}
+        onSelectDate={onSelectDate}
+        deliveryDates={deliveryDates}
+      />
     </View>
   );
 }
