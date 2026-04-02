@@ -25,9 +25,11 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import AddPantryItem from '../components/AddPantryItem';
+import { usePantry } from '../context/PantryContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Open Food Facts Barcode Lookup
 // Free public API - no key required. 4M+ food products from 150 countries.
 // Docs: https://openfoodfacts.github.io/openfoodfacts-server/api/
 const OFF_URL = 'https://world.openfoodfacts.org/api/v0/product';
@@ -68,7 +70,7 @@ function mapApiCategory(tags) {
   // Frozen
   if (joined.includes('frozen') || joined.includes('ice-cream') || joined.includes('ice cream')) return 'Frozen';
 
-  // Dry Goods - grains, pasta, rice, cereals, canned goods
+  // Dry Goods - grains, pasta, rice, cereals, canned goods, pulses
   if (joined.includes('rice') || joined.includes('pasta') || joined.includes('noodle') ||
       joined.includes('cereal') || joined.includes('grain') || joined.includes('flour') ||
       joined.includes('oat') || joined.includes('lentil') || joined.includes('bean') ||
@@ -110,10 +112,6 @@ function parseQuantity(product) {
     return { quantity: match[1], unit: unitMap[rawUnit] || rawUnit };
   }
 
-  // Only try the actual package quantity fields - NOT serving_size.
-  // serving_size is per-serving (e.g. "200 ml") not the total package size (e.g. "1 litre").
-  // If these fields are missing (common on incomplete OFF entries), return empty so the
-  // user knows to fill it in themselves rather than getting the wrong value silently.
   const packageSources = [
     product.quantity,         // e.g. "500 g" or "1 l" - most reliable
     product.product_quantity, // e.g. "500" - sometimes populated separately
@@ -135,6 +133,7 @@ function parseQuantity(product) {
 }
 
 export default function AddScreen({ navigation, route }) {
+  const { addPantryItem, updatePantryItem } = usePantry();
   const editingItem = route?.params?.item ?? null;
 
   const [editingId, setEditingId] = useState(editingItem?.id ?? null);
@@ -158,7 +157,7 @@ export default function AddScreen({ navigation, route }) {
     navigation.setOptions({ title: editingId ? 'Edit Item' : 'Add Item' });
   }, [editingId]);
 
-  // Open scanner
+  // Open scanner - request permission first
   async function handleOpenScanner() {
     if (!permission?.granted) {
       const { granted } = await requestPermission();
@@ -226,7 +225,7 @@ export default function AddScreen({ navigation, route }) {
     }
   }
 
-  // Form helpers 
+  // Form helpers
   function clearForm() {
     setEditingId(null);
     setName('');
@@ -282,8 +281,19 @@ export default function AddScreen({ navigation, route }) {
 
     setPosting(true);
     try {
-      // TODO: persist to SQLite and update global context
-      console.log(editingId ? 'Updating item:' : 'Adding item:', item);
+      // Persist to SQLite via context - mirrors into state immediately so
+      // PantryScreen re-renders without a second SELECT.
+      if (editingId) {
+        updatePantryItem(editingId, {
+          name: item.name, category: item.category, quantity: item.quantity,
+          unit: item.unit, location: item.location, expiryDate: item.expiryDate,
+        });
+      } else {
+        addPantryItem({
+          name: item.name, category: item.category, quantity: item.quantity,
+          unit: item.unit, location: item.location, expiryDate: item.expiryDate,
+        });
+      }
       Alert.alert(
         'Success',
         editingId ? `${item.name} updated.` : `${item.name} added to your pantry.`,
@@ -319,7 +329,7 @@ export default function AddScreen({ navigation, route }) {
             editingId={editingId}
             name={name}               
             setName={setName}
-            category={category}       
+            category={category}      
             setCategory={setCategory}
             quantity={quantity}       
             setQuantity={setQuantity}
