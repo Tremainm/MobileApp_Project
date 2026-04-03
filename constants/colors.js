@@ -6,3 +6,4 @@ export const Colors = {
 
   mutedText: "#7A7A7A",
 };
+ 
