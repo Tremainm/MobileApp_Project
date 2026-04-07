@@ -1,6 +1,6 @@
 // BasketScreen
 // - Purpose: Show the basket: shows products in basket, users can delete products and modify quantity of products.
-// - Key inputs: none (uses internal state and the `useBaskets` hook to fetch/manage basket products).
+// - Key inputs: none (uses BasketContext for SQLite + MongoDB backed basket state).
 // - Key outputs: basket list (BasketItem), Button to delete product(s) from the basket, drop-down to change quantity(maybe)
 // - Notes: This file should remain orchestration-only: UI and logic for form, image picking, and API calls are delegated to components and hooks.
 
@@ -20,70 +20,45 @@ import ShoppingAddItemForm from '../components/shop/ShoppingAddItemForm';
 import ShoppingAddButton from '../components/shop/ShoppingAddButton';
 import ShoppingListSection from '../components/shop/ShoppingListSection';
 import ShoppingSummaryCard from '../components/shop/ShoppingSummaryCard';
-import useBasket from '../hooks/useBasket';
-
-function getBasketItemId(entry, index) {
-  return entry?.product?._id || entry?.product?.id || String(index);
-}
+import { useBasket } from '../context/BasketContext';
 
 function buildMeta(item) {
   const quantityLabel = item.quantity ? `Qty ${item.quantity}` : 'Qty 1';
-  const detail = item.product?.category || item.product?.description || 'Basket item';
+  const detail = item.category || 'Basket item';
   return `${quantityLabel} • ${detail}`;
 }
 
-export default function ShopScreen({navigation}) {
-  const { basket, loading, fetchBasketItems, deleteBasketItem } = useBasket();
+export default function ShopScreen({ navigation }) {
+  const { basketItems, addBasketItem, deleteBasketItem } = useBasket();
+  
   const [checkedMap, setCheckedMap] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
-  const [customItems, setCustomItems] = useState([]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('Produce');
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('pcs');
 
-  const basketItems = useMemo(
-    () => basket.filter(item => item.product),
-    [basket]
-  );
-
+  // Map basket items from context into the shape the list components expect
   const mappedItems = useMemo(
-    () => basketItems.map((item, index) => {
-      const productId = getBasketItemId(item, index);
-      return {
-        key: productId,
-        productId,
-        source: 'basket',
-        name: item.product?.name || 'Unnamed item',
-        meta: buildMeta(item),
-      };
-    }),
+    () => basketItems.map(item => ({
+      key: item.id,
+      productId: item.id,
+      source: 'basket',
+      name: item.name || 'Unnamed item',
+      meta: buildMeta(item),
+    })),
     [basketItems]
   );
 
-  const allItems = useMemo(
-    () => [...customItems, ...mappedItems],
-    [customItems, mappedItems]
-  );
+  const toBuyItems = mappedItems.filter(item => !checkedMap[item.key]);
+  const checkedItems = mappedItems.filter(item => checkedMap[item.key]);
 
-  const toBuyItems = allItems.filter(item => !checkedMap[item.key]);
-  const checkedItems = allItems.filter(item => checkedMap[item.key]);
-
+  // Clean up checkedMap entries for items that no longer exist in the basket
   useEffect(() => {
-    fetchBasketItems();
-    // Refetch basket items when screen is focused (e.g. after coming back from Inventory or Browse)
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchBasketItems();
-    });
-    return unsubscribe;
-  }, [navigation]);
-
-  useEffect(() => {
-    const validKeys = new Set(allItems.map(item => item.key));
+    const validKeys = new Set(mappedItems.map(item => item.key));
     setCheckedMap(current => {
       const next = {};
       let changed = false;
-
       Object.entries(current).forEach(([key, value]) => {
         if (validKeys.has(key)) {
           next[key] = value;
@@ -91,10 +66,9 @@ export default function ShopScreen({navigation}) {
           changed = true;
         }
       });
-
       return changed ? next : current;
     });
-  }, [allItems]);
+  }, [mappedItems]);
 
   function resetAddForm() {
     setNewItemName('');
@@ -133,98 +107,80 @@ export default function ShopScreen({navigation}) {
       return;
     }
 
-    const id = `custom-${Date.now()}`;
-    setCustomItems(current => [
-      {
-        key: id,
-        productId: id,
-        source: 'custom',
-        name: trimmedName,
-        meta: `${trimmedQuantity} ${newItemUnit} • ${newItemCategory}`,
-      },
-      ...current,
-    ]);
+    // addBasketItem writes to SQLite, mirrors into context state, and syncs to MongoDB
+    addBasketItem({
+      name:     trimmedName,
+      category: newItemCategory,
+      quantity: Number(trimmedQuantity) || 1,
+      unit:     newItemUnit,
+    });
+
     resetAddForm();
     setShowAddForm(false);
   }
 
   function handleDeleteItem(item) {
-    if (item.source === 'custom') {
-      setCustomItems(current => current.filter(entry => entry.key !== item.key));
-      setCheckedMap(current => {
-        const next = { ...current };
-        delete next[item.key];
-        return next;
-      });
-      return;
-    }
-
+    // deleteBasketItem writes to SQLite, updates context state, and syncs to MongoDB
     deleteBasketItem(item.productId);
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#10bf86" />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.header}>Shopping List</Text>
+
+        <View style={styles.summaryRow}>
+          <ShoppingSummaryCard
+            label="To Buy"
+            value={toBuyItems.length}
+            backgroundColor="#eaf2ff"
+            accentColor="#2756ff"
+          />
+          <ShoppingSummaryCard
+            label="Checked"
+            value={checkedItems.length}
+            backgroundColor="#ecfbf0"
+            accentColor="#0ba642"
+          />
         </View>
-      ) : (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-          <Text style={styles.header}>Shopping List</Text>
 
-          <View style={styles.summaryRow}>
-            <ShoppingSummaryCard
-              label="To Buy"
-              value={toBuyItems.length}
-              backgroundColor="#eaf2ff"
-              accentColor="#2756ff"
+        <View style={styles.addButtonWrap}>
+          {showAddForm ? (
+            <ShoppingAddItemForm
+              name={newItemName}
+              category={newItemCategory}
+              quantity={newItemQuantity}
+              unit={newItemUnit}
+              onNameChange={setNewItemName}
+              onCategoryChange={setNewItemCategory}
+              onQuantityChange={setNewItemQuantity}
+              onUnitChange={setNewItemUnit}
+              onCancel={handleCancelAddForm}
+              onSubmit={handleAddCustomItem}
             />
-            <ShoppingSummaryCard
-              label="Checked"
-              value={checkedItems.length}
-              backgroundColor="#ecfbf0"
-              accentColor="#0ba642"
-            />
-          </View>
+          ) : (
+            <ShoppingAddButton onPress={handleOpenAddForm} />
+          )}
+        </View>
 
-          <View style={styles.addButtonWrap}>
-            {showAddForm ? (
-              <ShoppingAddItemForm
-                name={newItemName}
-                category={newItemCategory}
-                quantity={newItemQuantity}
-                unit={newItemUnit}
-                onNameChange={setNewItemName}
-                onCategoryChange={setNewItemCategory}
-                onQuantityChange={setNewItemQuantity}
-                onUnitChange={setNewItemUnit}
-                onCancel={handleCancelAddForm}
-                onSubmit={handleAddCustomItem}
-              />
-            ) : (
-              <ShoppingAddButton onPress={handleOpenAddForm} />
-            )}
-          </View>
+        <ShoppingListSection
+          title="To Buy"
+          items={toBuyItems}
+          checked={false}
+          onToggleChecked={toggleChecked}
+          onDelete={handleDeleteItem}
+          emptyText="No shopping items left to buy."
+        />
 
-          <ShoppingListSection
-            title="To Buy"
-            items={toBuyItems}
-            checked={false}
-            onToggleChecked={toggleChecked}
-            onDelete={handleDeleteItem}
-            emptyText="No shopping items left to buy."
-          />
-
-          <ShoppingListSection
-            title="Checked Off"
-            items={checkedItems}
-            checked
-            onToggleChecked={toggleChecked}
-            onDelete={handleDeleteItem}
-            emptyText="Nothing checked off yet."
-          />
-        </ScrollView>
-      )}
+        <ShoppingListSection
+          title="Checked Off"
+          items={checkedItems}
+          checked
+          onToggleChecked={toggleChecked}
+          onDelete={handleDeleteItem}
+          emptyText="Nothing checked off yet."
+        />
+      </ScrollView>
 
       <StatusBar style="auto" />
     </SafeAreaView>

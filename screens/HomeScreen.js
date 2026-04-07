@@ -1,8 +1,5 @@
 // HomeScreen
-// - Purpose: Simple welcome screen with navigation to Inventory screen.
-// - Props:
-//    - navigation: react-navigation prop used to navigate to other screens
-// - Output: renders a welcome message and a button to go to Inventory.
+// - Purpose: Dashboard showing pantry stats, expiring soon items, and quick actions.
 
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
@@ -14,18 +11,15 @@ import HomeSectionHeader from '../components/home/HomeSectionHeader';
 import QuickActionsSection from '../components/home/QuickActionsSection';
 import StatCard from '../components/home/StatCard';
 import { usePantry } from '../context/PantryContext';
-import useBasket from '../hooks/useBasket';
+import { useBasket } from '../context/BasketContext';
 import useNotifications from '../hooks/useNotifications';
 
 function getDaysUntilExpiry(expiryDate) {
   if (!expiryDate) return null;
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const expiry = new Date(expiryDate);
   expiry.setHours(0, 0, 0, 0);
-
   return Math.round((expiry - today) / (1000 * 60 * 60 * 24));
 }
 
@@ -42,49 +36,35 @@ function getAlertColor(daysLeft) {
 
 export default function HomeScreen({ navigation }) {
   const { getItems } = usePantry();
-  const { basket, fetchBasketItems } = useBasket();
-  useNotifications(); // registers handler, requests permission, and sets up Android channel
+  const { basketItems } = useBasket();
+  useNotifications();
 
   const pantryItems = getItems();
+
   const expiringItems = pantryItems
-    .map(item => ({
-      ...item,
-      daysLeft: getDaysUntilExpiry(item.expiryDate),
-    }))
+    .map(item => ({ ...item, daysLeft: getDaysUntilExpiry(item.expiryDate) }))
     .filter(item => item.daysLeft !== null && item.daysLeft >= 0 && item.daysLeft <= 7)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
   const totalItems = pantryItems.length;
   const expiringCount = expiringItems.length;
-  const toBuyCount = basket.length;
+  const toBuyCount = basketItems.length;
   const upcomingItems = expiringItems.slice(0, 3);
 
-  // Load the basket on mount and every time the screen comes back into focus.
+  // Schedule a notification when the basket has items
   useEffect(() => {
-    fetchBasketItems().catch(() => {});
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchBasketItems().catch(() => {});
-    });
-    return unsubscribe;
-  }, [navigation]);
-
-  // Remind the user if they have items in the basket.
-  useEffect(() => {
-    const itemCount = basket?.length ?? 0;
+    const itemCount = basketItems.length;
     if (itemCount > 0) {
-      console.log("Scheduling basket reminder");
-      // Uncomment to prevent duplicate notifications if the user navigates back and forth.
-      // Notifications.cancelAllScheduledNotificationsAsync();
       Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Items in your basket',
-          body: `You have ${itemCount} item(s) waiting — don't forget to checkout!`,
+          title: 'Items in your shopping list',
+          body: `You have ${itemCount} item${itemCount === 1 ? '' : 's'} to buy - don't forget to shop!`,
           channelId: 'default',
         },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 5 }
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 5 },
       });
     }
-  }, [basket]);
+  }, [basketItems.length]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -136,33 +116,17 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0eb28f',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f6f8',
-  },
-  contentContainer: {
-    paddingBottom: 28,
-  },
+  safeArea: { flex: 1, backgroundColor: '#0eb28f' },
+  container: { flex: 1, backgroundColor: '#f5f6f8' },
+  contentContainer: { paddingBottom: 28 },
   heroSection: {
     backgroundColor: '#0eb28f',
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 26,
   },
-  statsRow: {
-    flexDirection: 'row',
-    columnGap: 16,
-  },
-  bodySection: {
-    flex: 1,
-    backgroundColor: '#f5f6f8',
-    paddingHorizontal: 16,
-    paddingTop: 22,
-  },
+  statsRow: { flexDirection: 'row', columnGap: 16 },
+  bodySection: { flex: 1, backgroundColor: '#f5f6f8', paddingHorizontal: 16, paddingTop: 22 },
   emptyCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -174,19 +138,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#112033',
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6d7782',
-    lineHeight: 20,
-  },
-  quickActionsSection: {
-    marginTop: 10,
-    marginBottom: 8,
-  },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#112033', marginBottom: 6 },
+  emptyText: { fontSize: 14, color: '#6d7782', lineHeight: 20 },
+  quickActionsSection:  { marginTop: 10, marginBottom: 8 },
 });
