@@ -45,7 +45,8 @@ export async function initDatabase(db) {
       quantity REAL NOT NULL,
       unit TEXT NOT NULL,
       location TEXT NOT NULL,
-      expiryDate TEXT
+      expiryDate TEXT,
+      mongoId TEXT
     );
   `);
 
