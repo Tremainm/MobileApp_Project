@@ -14,6 +14,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
+import pantryApi from '../api/pantryApi';
 
 const PantryContext = createContext(null);
 
@@ -53,20 +54,32 @@ export function PantryProvider({ children }) {
   // VALUES (?, ?, ?, ?, ?, ?, ?)
   const addPantryItem = useCallback(({ name, category, quantity, unit, location, expiryDate }) => {
     const id = Date.now().toString();
-    const newItem = { id, name, category, quantity, unit, location, expiryDate: expiryDate ?? null };
+    const newItem = { id, name, category, quantity, unit, location, expiryDate: expiryDate ?? null, mongoId: null };
     // Mirror into state immediately so UI updates without waiting for DB
     setItems(prev => [...prev, newItem]);
     db.runAsync(
       'INSERT INTO pantry_items (id, name, category, quantity, unit, location, expiryDate) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, name, category, quantity, unit, location, expiryDate ?? null]
     );
+
+    pantryApi.createPantryItem({ name, category, quantity, unit, location, expiryDate: expiryDate ?? null })
+      .then(res => {
+        const mongoId = res?.item?._id;
+        if (mongoId) {
+          db.runAsync('UPDATE pantry_items SET mongoId = ? WHERE id = ?', [mongoId, id]);
+          setItems(prev => prev.map(item => item.id === id ? { ...item, mongoId } : item));
+        }
+      })
+      .catch(err => console.warn('[PantryContext] MongoDB sync failed on add:', err.message));
+
     return newItem;
   }, [db]);
 
   // UPDATE pantry_items SET name=?, category=?, quantity=?, unit=?,
   // location=?, expiryDate=? WHERE id = ?
   const updatePantryItem = useCallback((id, { name, category, quantity, unit, location, expiryDate }) => {
-    // Mirror into state immediately
+    const mongoId = items.find(i => i.id === id)?.mongoId;
+
     setItems(prev =>
       prev.map(item =>
         item.id === id
@@ -78,13 +91,27 @@ export function PantryProvider({ children }) {
       'UPDATE pantry_items SET name=?, category=?, quantity=?, unit=?, location=?, expiryDate=? WHERE id=?',
       [name, category, quantity, unit, location, expiryDate ?? null, id]
     );
-  }, [db]);
+
+    if (mongoId) {
+      pantryApi.updatePantryItem(mongoId, { name, category, quantity, unit, location, expiryDate: expiryDate ?? null }).catch(err =>
+        console.warn('[PantryContext] MongoDB sync failed on update:', err.message)
+      );
+    }
+  }, [db, items]);
 
   // DELETE FROM pantry_items WHERE id = ?
   const deletePantryItem = useCallback((id) => {
+    const mongoId = items.find(i => i.id === id)?.mongoId;
+
     setItems(prev => prev.filter(item => item.id !== id));
     db.runAsync('DELETE FROM pantry_items WHERE id = ?', [id]);
-  }, [db]);
+
+    if (mongoId) {
+      pantryApi.deletePantryItem(mongoId).catch(err =>
+        console.warn('[PantryContext] MongoDB sync failed on delete:', err.message)
+      );
+    }
+  }, [db, items]);
 
   return (
     <PantryContext.Provider
