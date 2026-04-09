@@ -1,9 +1,12 @@
-// HomeScreen
 // - Purpose: Dashboard showing pantry stats, expiring soon items, and quick actions.
+// - Auth additions:
+//     - Posts the Expo push token to the server once after login
+//     - Shows a Logout button in the top-right area
 
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { Ionicons } from '@expo/vector-icons';
 
 import ExpiringSoonCard from '../components/home/ExpiringSoonCard';
 import HomeHeader from '../components/home/HomeHeader';
@@ -12,7 +15,9 @@ import QuickActionsSection from '../components/home/QuickActionsSection';
 import StatCard from '../components/home/StatCard';
 import { usePantry } from '../context/PantryContext';
 import { useBasket } from '../context/BasketContext';
+import { useAuth } from '../context/AuthContext';
 import useNotifications from '../hooks/useNotifications';
+import authApi from '../api/authApi';
 
 function getDaysUntilExpiry(expiryDate) {
   if (!expiryDate) return null;
@@ -37,7 +42,11 @@ function getAlertColor(daysLeft) {
 export default function HomeScreen({ navigation }) {
   const { getItems } = usePantry();
   const { basketItems } = useBasket();
-  useNotifications();
+  const { logout } = useAuth();
+  const { expoPushToken } = useNotifications();
+
+  // Track whether we've already posted the push token this session
+  const pushTokenPosted = useRef(false);
 
   const pantryItems = getItems();
 
@@ -50,6 +59,16 @@ export default function HomeScreen({ navigation }) {
   const expiringCount = expiringItems.length;
   const toBuyCount = basketItems.length;
   const upcomingItems = expiringItems.slice(0, 3);
+
+  // Post the Expo push token to the backend once after login
+  useEffect(() => {
+    if (expoPushToken && !pushTokenPosted.current) {
+      pushTokenPosted.current = true;
+      authApi.postPushToken(expoPushToken).catch(err =>
+        console.warn('[HomeScreen] Failed to save push token:', err.message)
+      );
+    }
+  }, [expoPushToken]);
 
   // Schedule a notification when the basket has items
   useEffect(() => {
@@ -70,7 +89,16 @@ export default function HomeScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.heroSection}>
-          <HomeHeader />
+          {/* Logout button sits alongside the header */}
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <HomeHeader />
+            </View>
+            <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
+              <Ionicons name="log-out-outline" size={22} color="#fff" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.statsRow}>
             <StatCard label="Total" value={totalItems} suffix="Items" />
@@ -125,6 +153,23 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 26,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  logoutText: { fontSize: 13, fontWeight: '600', color: '#fff' },
   statsRow: { flexDirection: 'row', columnGap: 16 },
   bodySection: { flex: 1, backgroundColor: '#f5f6f8', paddingHorizontal: 16, paddingTop: 22 },
   emptyCard: {
@@ -140,5 +185,5 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: '#112033', marginBottom: 6 },
   emptyText: { fontSize: 14, color: '#6d7782', lineHeight: 20 },
-  quickActionsSection:  { marginTop: 10, marginBottom: 8 },
+  quickActionsSection: { marginTop: 10, marginBottom: 8 },
 });

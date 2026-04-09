@@ -157,6 +157,22 @@ export default function AddScreen({ navigation, route }) {
     navigation.setOptions({ title: editingId ? 'Edit Item' : 'Add Item' });
   }, [editingId]);
 
+  // Re-populate form whenever route.params changes (e.g. navigating from PantryScreen to edit a different item)
+  useEffect(() => {
+    const item = route?.params?.item ?? null;
+    if (item) {
+      setEditingId(item.id);
+      setName(item.name ?? '');
+      setCategory(item.category ?? '');
+      setQuantity(item.quantity != null ? String(item.quantity) : '');
+      setUnit(item.unit ?? '');
+      setLocation(item.location ?? '');
+      setExpiryDate(item.expiryDate ?? '');
+    } else {
+      clearForm();
+    }
+  }, [route?.params]);
+
   // Open scanner - request permission first
   async function handleOpenScanner() {
     if (!permission?.granted) {

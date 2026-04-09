@@ -1,14 +1,10 @@
-// basketApi.js
 // HTTP calls to the basket backend REST API.
 // Basket items are standalone entries: { name, category, quantity, unit }
 // All functions throw on non-OK responses.
+// All requests include a Bearer token via authToken.getAuthHeaders().
 
 import { BASE_URL } from '../config';
-
-const HEADERS = {
-  'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': 'true',
-};
+import authToken from './authToken';
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -20,7 +16,7 @@ async function handleResponse(res) {
 
 // GET /basket - returns array of all basket items
 async function getAllBasketItems() {
-  const res = await fetch(`${BASE_URL}/basket`, { headers: HEADERS });
+  const res = await fetch(`${BASE_URL}/basket`, { headers: authToken.getAuthHeaders() });
   if (!res.ok) throw new Error(`Server responded ${res.status}`);
   return res.json();
 }
@@ -30,7 +26,7 @@ async function getAllBasketItems() {
 async function createBasketItem(body) {
   const res = await fetch(`${BASE_URL}/basket`, {
     method: 'POST',
-    headers: HEADERS,
+    headers: authToken.getAuthHeaders(),
     body: JSON.stringify(body),
   });
   return handleResponse(res);
@@ -41,7 +37,7 @@ async function createBasketItem(body) {
 async function updateBasketItem(id, body) {
   const res = await fetch(`${BASE_URL}/basket/${id}`, {
     method: 'PUT',
-    headers: HEADERS,
+    headers: authToken.getAuthHeaders(),
     body: JSON.stringify(body),
   });
   return handleResponse(res);
@@ -51,7 +47,7 @@ async function updateBasketItem(id, body) {
 async function deleteBasketItem(id) {
   const res = await fetch(`${BASE_URL}/basket/${id}`, {
     method: 'DELETE',
-    headers: HEADERS,
+    headers: authToken.getAuthHeaders(),
   });
   if (!res.ok) {
     const text = await res.text();

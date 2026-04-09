@@ -26,7 +26,7 @@ export default function PantryScreen({ navigation }) {
 
   function handleEdit(item) {
     // Navigate to AddScreen in edit mode - passes the full item as a route param
-    navigation.push('Add', { item });
+    navigation.navigate('Add', { item, timestamp: Date.now() });
   }
 
   function handleDelete(id) {
