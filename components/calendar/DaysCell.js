@@ -2,22 +2,30 @@ import { useMemo } from "react";
 import { StyleSheet, Text, View, Pressable } from "react-native";
 import { isSameDay } from "../../utils/date";
 import { Colors } from "../../constants/colors";
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function DaysCell({
   item,
   selectedDate,
   onPress,
-  deliveryDates,
+  expiryCountsByDateKey,
 }) {
   const isSelected = useMemo(
     () => isSameDay(item.date, selectedDate),
     [item.date, selectedDate],
   );
 
-  const dateKey = useMemo(() => {
-    return item.date.toISOString().split("T")[0];
-  }, [item.date]);
-
-  const hasDelivery = item.inMonth && deliveryDates?.has(dateKey);
+  const markerCount = useMemo(() => {
+    if (!item.inMonth) return 0;
+    const dateKey = toDateKey(item.date);
+    return Math.min(expiryCountsByDateKey?.get(dateKey) || 0, 3);
+  }, [item.date, item.inMonth, expiryCountsByDateKey]);
 
   return (
     <View style={styles.cell}>
@@ -44,12 +52,19 @@ export default function DaysCell({
               {item.day}
             </Text>
           </View>
-          {hasDelivery && <View style={styles.deliveryDot} />}
+          {markerCount > 0 && (
+            <View style={styles.dotRow}>
+              {Array.from({ length: markerCount }).map((_, index) => (
+                <View key={index} style={styles.deliveryDot} />
+              ))}
+            </View>
+          )}
         </View>
       </Pressable>
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   cell: {
     width: "14.285%", // 100 / 7
@@ -70,6 +85,7 @@ const styles = StyleSheet.create({
   content: {
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
   },
   circle: {
     width: 36,
@@ -87,7 +103,6 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     fontWeight: "500",
   },
-
   todayCircle: {
     borderWidth: 1,
     borderColor: Colors.mutedGreen,
@@ -96,7 +111,6 @@ const styles = StyleSheet.create({
   todayText: {
     color: "#111827",
   },
-
   selectedCircle: {
     borderWidth: 1,
     borderColor: Colors.green,
@@ -105,9 +119,17 @@ const styles = StyleSheet.create({
   selectedText: {
     color: "white",
   },
+  dotRow: {
+    position: "absolute",
+    bottom: -6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
   deliveryDot: {
-    width: 6,
-    height: 6,
+    width: 5,
+    height: 5,
     borderRadius: 3,
     backgroundColor: Colors.dpdRed,
   },

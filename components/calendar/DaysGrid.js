@@ -1,7 +1,12 @@
 import { StyleSheet, View } from "react-native";
 import DaysCell from "./DaysCell";
 
-export default function DaysGrid({ days = [], selectedDate, onSelectDate, deliveryDates }) {
+export default function DaysGrid({
+  days = [],
+  selectedDate,
+  onSelectDate,
+  expiryCountsByDateKey,
+}) {
   return (
     <View style={styles.daysGrid}>
       {days.map((day) => (
@@ -10,12 +15,13 @@ export default function DaysGrid({ days = [], selectedDate, onSelectDate, delive
           item={day}
           selectedDate={selectedDate}
           onPress={onSelectDate}
-          deliveryDates={deliveryDates}
+          expiryCountsByDateKey={expiryCountsByDateKey}
         />
       ))}
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   daysGrid: {
     flexDirection: "row",
