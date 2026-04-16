@@ -11,11 +11,13 @@ import {
   Text,
   View,
   ActivityIndicator,
+  TouchableOpacity,
   SafeAreaView,
   ScrollView,
   Alert,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import ShoppingAddItemForm from '../components/shop/ShoppingAddItemForm';
 import ShoppingAddButton from '../components/shop/ShoppingAddButton';
 import ShoppingListSection from '../components/shop/ShoppingListSection';
@@ -29,7 +31,7 @@ function buildMeta(item) {
 }
 
 export default function ShopScreen({ navigation }) {
-  const { basketItems, addBasketItem, deleteBasketItem } = useBasket();
+  const { basketItems, addBasketItem, deleteBasketItem, saveShoppingList } = useBasket();
   
   const [checkedMap, setCheckedMap] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
@@ -82,6 +84,19 @@ export default function ShopScreen({ navigation }) {
       ...current,
       [itemKey]: !current[itemKey],
     }));
+  }
+
+  async function handleSaveList() {
+    if (basketItems.length === 0) {
+      Alert.alert('Empty basket', 'Add some items before saving your list.');
+      return;
+    }
+    try {
+      const result = await saveShoppingList();
+      Alert.alert('List saved!', 'Your shopping list has been saved to the cloud.');
+    } catch (err) {
+      Alert.alert('Save failed', err.message);
+    }
   }
 
   function handleOpenAddForm() {
@@ -180,6 +195,11 @@ export default function ShopScreen({ navigation }) {
           onDelete={handleDeleteItem}
           emptyText="Nothing checked off yet."
         />
+
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveList} activeOpacity={0.85}>
+          <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+          <Text style={styles.saveBtnText}>Save List</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <StatusBar style="auto" />
@@ -222,5 +242,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0eb28f',
+    borderRadius: 14,
+    paddingVertical: 13,
+    marginHorizontal: 12,
+    marginBottom: 20,
+    gap: 8,
+  },
+  saveBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
