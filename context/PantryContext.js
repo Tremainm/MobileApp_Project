@@ -139,9 +139,14 @@ export function PantryProvider({ children }) {
     }
   }, [db, items]);
 
+  const getSuggestions = useCallback(async () => {
+    const currentItems = getItems();
+    return pantryApi.getSuggestions(currentItems);
+  }, [getItems]);
+
   return (
     <PantryContext.Provider
-      value={{ getItems, getItemsByCategory, getCategories, addPantryItem, updatePantryItem, deletePantryItem }}
+      value={{ getItems, getItemsByCategory, getCategories, addPantryItem, updatePantryItem, deletePantryItem, getSuggestions }}
     >
       {children}
     </PantryContext.Provider>

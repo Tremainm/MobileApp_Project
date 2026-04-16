@@ -56,7 +56,7 @@ export function BasketProvider({ children }) {
 
   // INSERT INTO basket_items (id, name, category, quantity, unit) VALUES (?, ?, ?, ?, ?)
   const addBasketItem = useCallback(({ name, category, quantity, unit }) => {
-    const tempId  = Date.now().toString();
+    const tempId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newItem = { id: tempId, name, category, quantity, unit, mongoId: null };
 
     // Update local state immediately so UI re-renders without waiting for DB

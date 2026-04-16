@@ -23,6 +23,7 @@ import ShoppingAddButton from '../components/shop/ShoppingAddButton';
 import ShoppingListSection from '../components/shop/ShoppingListSection';
 import ShoppingSummaryCard from '../components/shop/ShoppingSummaryCard';
 import { useBasket } from '../context/BasketContext';
+import { usePantry } from '../context/PantryContext';
 
 function buildMeta(item) {
   const quantityLabel = item.quantity ? `Qty ${item.quantity}` : 'Qty 1';
@@ -32,6 +33,7 @@ function buildMeta(item) {
 
 export default function ShopScreen({ navigation }) {
   const { basketItems, addBasketItem, updateBasketItem, deleteBasketItem, saveShoppingList } = useBasket();
+  const { getItems, getSuggestions } = usePantry();
   
   const [checkedMap, setCheckedMap] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
@@ -40,6 +42,7 @@ export default function ShopScreen({ navigation }) {
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('pcs');
   const [editingItem, setEditingItem] = useState(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   // Map basket items from context into the shape the list components expect
   const mappedItems = useMemo(
@@ -72,6 +75,39 @@ export default function ShopScreen({ navigation }) {
       return changed ? next : current;
     });
   }, [mappedItems]);
+
+  async function handleGetSuggestions() {
+    if (getItems().length === 0) {
+      Alert.alert('Pantry empty', 'Add some pantry items first so we can make suggestions.');
+      return;
+    }
+    setLoadingSuggestions(true);
+    try {
+      const { suggestions } = await getSuggestions();
+      Alert.alert(
+        'Add suggestions to basket?',
+        suggestions.map(s => `• ${s.name} (${s.quantity} ${s.unit})`).join('\n'),
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add All',
+            onPress: () => {
+              suggestions.forEach(s => addBasketItem({
+                name: s.name,
+                category: s.category,
+                quantity: s.quantity,
+                unit: s.unit,
+              }));
+            },
+          },
+        ]
+      );
+    } catch (err) {
+      Alert.alert('Error', 'Could not get suggestions. Try again.');
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
 
   function resetAddForm() {
     setNewItemName('');
@@ -165,6 +201,18 @@ export default function ShopScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <Text style={styles.header}>Shopping List</Text>
+
+        <TouchableOpacity
+          style={[styles.suggestBtn, loadingSuggestions && { opacity: 0.6 }]}
+          onPress={handleGetSuggestions}
+          disabled={loadingSuggestions}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="sparkles-outline" size={18} color="#fff" />
+          <Text style={styles.suggestBtnText}>
+            {loadingSuggestions ? 'Getting suggestions...' : 'Suggest items from pantry'}
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.summaryRow}>
           <ShoppingSummaryCard
@@ -280,6 +328,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   saveBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  suggestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7c3aed',
+    borderRadius: 14,
+    paddingVertical: 13,
+    marginHorizontal: 2,
+    marginBottom: 20,
+    gap: 8,
+  },
+  suggestBtnText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',

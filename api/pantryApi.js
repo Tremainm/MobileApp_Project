@@ -14,6 +14,15 @@ async function handleResponse(res) {
   return res.json().catch(() => null);
 }
 
+async function getSuggestions(items) {
+  const res = await fetch(`${BASE_URL}/suggestions`, {
+    method: 'POST',
+    headers: authToken.getAuthHeaders(),
+    body: JSON.stringify({ items }),
+  });
+  return handleResponse(res);
+}
+
 // GET /pantry - returns array of all pantry items
 async function getAllPantryItems() {
   const res = await fetch(`${BASE_URL}/pantry`, { headers: authToken.getAuthHeaders() });
@@ -56,4 +65,4 @@ async function deletePantryItem(id) {
   return true;
 }
 
-export default { getAllPantryItems, createPantryItem, updatePantryItem, deletePantryItem };
+export default { getAllPantryItems, createPantryItem, updatePantryItem, deletePantryItem, getSuggestions };
