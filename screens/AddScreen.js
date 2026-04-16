@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import AddPantryItem from '../components/AddPantryItem';
 import { usePantry } from '../context/PantryContext';
+import useNotifications from '../hooks/useNotifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -134,6 +135,7 @@ function parseQuantity(product) {
 
 export default function AddScreen({ navigation, route }) {
   const { addPantryItem, updatePantryItem } = usePantry();
+  const { expoPushToken } = useNotifications();
   const editingItem = route?.params?.item ?? null;
 
   const [editingId, setEditingId] = useState(editingItem?.id ?? null);
@@ -172,6 +174,19 @@ export default function AddScreen({ navigation, route }) {
       clearForm();
     }
   }, [route?.params]);
+
+  async function sendPushNotification(expoPushToken, name) {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: expoPushToken,
+        sound: 'default',
+        title: 'Item Added',
+        body: `${name} has been added to your pantry.`,
+      }),
+    });
+  }
 
   // Open scanner - request permission first
   async function handleOpenScanner() {
@@ -282,6 +297,11 @@ export default function AddScreen({ navigation, route }) {
     if (!category) return Alert.alert('Validation', 'Please select a category.');
     if (!quantity.trim() || isNaN(Number(quantity))) return Alert.alert('Validation', 'Please enter a valid quantity.');
     if (!unit.trim()) return Alert.alert('Validation', 'Please select or enter a unit.');
+    if (!editingId && expoPushToken) {
+      sendPushNotification(expoPushToken, name.trim()).catch(err =>
+        console.warn('[Push] Failed to send:', err.message)
+      );
+    }
 
     const isoDate = parseDisplayDate(expiryDate);
 

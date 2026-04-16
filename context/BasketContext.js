@@ -1,14 +1,14 @@
 // BasketContext.js
 // Global basket state backed by SQLite, with background MongoDB sync.
-// Mirrors the PantryContext pattern — every mutation writes to SQLite and
+// Mirrors the PantryContext pattern - every mutation writes to SQLite and
 // updates state immediately so all screens re-render without a second SELECT.
 // MongoDB sync runs in the background after each local operation.
 //
 // SQL concepts:
-//   SELECT * FROM basket_items                        — load on mount
-//   INSERT INTO basket_items (...) VALUES (?, ...)   — addBasketItem
-//   UPDATE basket_items SET quantity = ? WHERE id = ? — updateBasketItem
-//   DELETE FROM basket_items WHERE id = ?            — deleteBasketItem
+//   SELECT * FROM basket_items                        - load on mount
+//   INSERT INTO basket_items (...) VALUES (?, ...)   - addBasketItem
+//   UPDATE basket_items SET quantity = ? WHERE id = ? - updateBasketItem
+//   DELETE FROM basket_items WHERE id = ?            - deleteBasketItem
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -78,9 +78,13 @@ export function BasketProvider({ children }) {
     );
   }, [db]);
 
+  const saveShoppingList = useCallback(async () => {
+    return basketApi.saveShoppingList();
+  }, []);
+
   return (
     <BasketContext.Provider
-      value={{ basketItems, getBasketItems, addBasketItem, updateBasketItem, deleteBasketItem }}
+      value={{ basketItems, getBasketItems, addBasketItem, updateBasketItem, deleteBasketItem, saveShoppingList }}
     >
       {children}
     </BasketContext.Provider>

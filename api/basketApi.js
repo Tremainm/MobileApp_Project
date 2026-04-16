@@ -32,6 +32,15 @@ async function createBasketItem(body) {
   return handleResponse(res);
 }
 
+// POST /basket/save-list - saves the current basket to S3
+async function saveShoppingList() {
+  const res = await fetch(`${BASE_URL}/basket/save-list`, {
+    method: 'POST',
+    headers: authToken.getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
 // PUT /basket/:id - updates a basket item
 // body: { quantity }
 async function updateBasketItem(id, body) {
@@ -56,4 +65,4 @@ async function deleteBasketItem(id) {
   return true;
 }
 
-export default { getAllBasketItems, createBasketItem, updateBasketItem, deleteBasketItem };
+export default { getAllBasketItems, createBasketItem, updateBasketItem, deleteBasketItem, saveShoppingList  };
