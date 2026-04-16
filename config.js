@@ -1,1 +1,1 @@
-export const BASE_URL="http://100.29.96.62:3000"
+export const BASE_URL="https://nonagglomerative-hoa-monostichic.ngrok-free.dev"
