@@ -31,7 +31,7 @@ function buildMeta(item) {
 }
 
 export default function ShopScreen({ navigation }) {
-  const { basketItems, addBasketItem, deleteBasketItem, saveShoppingList } = useBasket();
+  const { basketItems, addBasketItem, updateBasketItem, deleteBasketItem, saveShoppingList } = useBasket();
   
   const [checkedMap, setCheckedMap] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
@@ -39,6 +39,7 @@ export default function ShopScreen({ navigation }) {
   const [newItemCategory, setNewItemCategory] = useState('Produce');
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('pcs');
+  const [editingItem, setEditingItem] = useState(null);
 
   // Map basket items from context into the shape the list components expect
   const mappedItems = useMemo(
@@ -105,10 +106,11 @@ export default function ShopScreen({ navigation }) {
 
   function handleCancelAddForm() {
     resetAddForm();
+    setEditingItem(null);
     setShowAddForm(false);
   }
 
-  function handleAddCustomItem() {
+  function handleSubmitForm() {
     const trimmedName = newItemName.trim();
     const trimmedQuantity = newItemQuantity.trim();
 
@@ -116,22 +118,42 @@ export default function ShopScreen({ navigation }) {
       Alert.alert('Missing item name', 'Enter an item name before adding it to the shopping list.');
       return;
     }
-
     if (!trimmedQuantity) {
       Alert.alert('Missing quantity', 'Enter a quantity before adding the item.');
       return;
     }
 
-    // addBasketItem writes to SQLite, mirrors into context state, and syncs to MongoDB
-    addBasketItem({
-      name:     trimmedName,
-      category: newItemCategory,
-      quantity: Number(trimmedQuantity) || 1,
-      unit:     newItemUnit,
-    });
+    if (editingItem) {
+      updateBasketItem(editingItem.id, {
+        name: trimmedName,
+        category: newItemCategory,
+        quantity: Number(trimmedQuantity) || 1,
+        unit: newItemUnit,
+      });
+    } else {
+      addBasketItem({
+        name: trimmedName,
+        category: newItemCategory,
+        quantity: Number(trimmedQuantity) || 1,
+        unit: newItemUnit,
+      });
+    }
 
     resetAddForm();
+    setEditingItem(null);
     setShowAddForm(false);
+  }
+
+  function handleOpenEditForm(item) {
+    // item here is the mapped item from mappedItems - we need the raw basket item for current values
+    const raw = basketItems.find(b => b.id === item.productId);
+    if (!raw) return;
+    setEditingItem(raw);
+    setNewItemName(raw.name);
+    setNewItemCategory(raw.category);
+    setNewItemQuantity(String(raw.quantity));
+    setNewItemUnit(raw.unit);
+    setShowAddForm(true);
   }
 
   function handleDeleteItem(item) {
@@ -162,6 +184,7 @@ export default function ShopScreen({ navigation }) {
         <View style={styles.addButtonWrap}>
           {showAddForm ? (
             <ShoppingAddItemForm
+              editingId={editingItem?.id}
               name={newItemName}
               category={newItemCategory}
               quantity={newItemQuantity}
@@ -171,7 +194,7 @@ export default function ShopScreen({ navigation }) {
               onQuantityChange={setNewItemQuantity}
               onUnitChange={setNewItemUnit}
               onCancel={handleCancelAddForm}
-              onSubmit={handleAddCustomItem}
+              onSubmit={handleSubmitForm}
             />
           ) : (
             <ShoppingAddButton onPress={handleOpenAddForm} />
@@ -184,6 +207,7 @@ export default function ShopScreen({ navigation }) {
           checked={false}
           onToggleChecked={toggleChecked}
           onDelete={handleDeleteItem}
+          onEdit={handleOpenEditForm}
           emptyText="No shopping items left to buy."
         />
 
@@ -193,6 +217,7 @@ export default function ShopScreen({ navigation }) {
           checked
           onToggleChecked={toggleChecked}
           onDelete={handleDeleteItem}
+          onEdit={handleOpenEditForm}
           emptyText="Nothing checked off yet."
         />
 

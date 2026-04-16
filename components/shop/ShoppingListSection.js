@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import ShoppingListItemCard from './ShoppingListItemCard';
 
-export default function ShoppingListSection({ title, items, checked, onToggleChecked, onDelete, emptyText }) {
+export default function ShoppingListSection({ title, items, checked, onToggleChecked, onDelete, onEdit, emptyText }) {
   return (
     <View style={styles.section}>
       <Text style={styles.title}>{title}</Text>
@@ -17,6 +17,7 @@ export default function ShoppingListSection({ title, items, checked, onToggleChe
             checked={checked}
             onToggleChecked={() => onToggleChecked(item.key)}
             onDelete={() => onDelete(item)}
+            onEdit={() => onEdit(item)}
           />
         ))
       ) : (

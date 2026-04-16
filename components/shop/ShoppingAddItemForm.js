@@ -7,6 +7,7 @@ const CATEGORY_OPTIONS = ['Produce', 'Dairy', 'Bakery', 'Drinks', 'Dry Goods', '
 const UNIT_OPTIONS = ['pcs', 'gallon', 'bag', 'pack', 'box', 'bottle', 'kg', 'g', 'litre'];
 
 export default function ShoppingAddItemForm({
+  editingId,
   name,
   category,
   quantity,
@@ -20,7 +21,7 @@ export default function ShoppingAddItemForm({
 }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Add New Item</Text>
+      <Text style={styles.title}>{editingId ? 'Edit Item' : 'Add New Item'}</Text>
 
       <TextInput
         style={styles.nameInput}
@@ -62,7 +63,7 @@ export default function ShoppingAddItemForm({
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addButton} onPress={onSubmit} activeOpacity={0.85}>
-          <Text style={styles.addText}>Add</Text>
+          <Text style={styles.addText}>{editingId ? 'Save' : 'Add'}</Text>
         </TouchableOpacity>
       </View>
     </View>

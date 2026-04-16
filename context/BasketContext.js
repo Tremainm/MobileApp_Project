@@ -20,11 +20,33 @@ export function BasketProvider({ children }) {
   const db = useSQLiteContext();
   const [basketItems, setBasketItems] = useState([]);
 
-  // Load all basket items from SQLite on mount
   useEffect(() => {
-    db.getAllAsync('SELECT * FROM basket_items').then(rows => {
-      setBasketItems(rows);
-    });
+    let cancelled = false;
+
+    async function syncFromMongoDB() {
+      const localRows = await db.getAllAsync('SELECT * FROM basket_items');
+      if (!cancelled) setBasketItems(localRows);
+
+      try {
+        const serverItems = await basketApi.getAllBasketItems();
+
+        await db.runAsync('DELETE FROM basket_items');
+        for (const item of serverItems) {
+          await db.runAsync(
+            'INSERT INTO basket_items (id, name, category, quantity, unit, mongoId) VALUES (?, ?, ?, ?, ?, ?)',
+            [item._id, item.name, item.category, item.quantity, item.unit, item._id]
+          );
+        }
+
+        const freshRows = await db.getAllAsync('SELECT * FROM basket_items');
+        if (!cancelled) setBasketItems(freshRows);
+      } catch (err) {
+        console.warn('[BasketContext] MongoDB sync on mount failed, using local data:', err.message);
+      }
+    }
+
+    syncFromMongoDB();
+    return () => { cancelled = true; };
   }, [db]);
 
   // Returns all basket items sorted by name. Synchronous — reads from state.
@@ -34,8 +56,8 @@ export function BasketProvider({ children }) {
 
   // INSERT INTO basket_items (id, name, category, quantity, unit) VALUES (?, ?, ?, ?, ?)
   const addBasketItem = useCallback(({ name, category, quantity, unit }) => {
-    const id = Date.now().toString();
-    const newItem = { id, name, category, quantity, unit };
+    const tempId  = Date.now().toString();
+    const newItem = { id: tempId, name, category, quantity, unit, mongoId: null };
 
     // Update local state immediately so UI re-renders without waiting for DB
     setBasketItems(prev => [...prev, newItem]);
@@ -43,40 +65,58 @@ export function BasketProvider({ children }) {
     // Write to SQLite
     db.runAsync(
       'INSERT INTO basket_items (id, name, category, quantity, unit) VALUES (?, ?, ?, ?, ?)',
-      [id, name, category, quantity, unit]
+      [tempId, name, category, quantity, unit]
     );
 
     // Sync to MongoDB in background — non-blocking so UI is never delayed
-    basketApi.createBasketItem({ name, category, quantity, unit }).catch(err =>
-      console.warn('[BasketContext] MongoDB sync failed on add:', err.message)
-    );
+    basketApi.createBasketItem({ name, category, quantity, unit })
+      .then(res => {
+        const mongoId = res?.item?._id;
+        if (mongoId) {
+          db.runAsync('UPDATE basket_items SET mongoId = ? WHERE id = ?', [mongoId, tempId]);
+          setBasketItems(prev =>
+            prev.map(item => item.id === tempId ? { ...item, mongoId } : item)
+          );
+        }
+      })
+      .catch(err => console.warn('[BasketContext] MongoDB sync failed on add:', err.message));
 
     return newItem;
   }, [db]);
 
-  // UPDATE basket_items SET quantity = ? WHERE id = ?
-  const updateBasketItem = useCallback((id, { quantity }) => {
+  // UPDATE basket_items SET name, category, quantity, unit = ?, ?, ?, ? WHERE id = ?
+  const updateBasketItem = useCallback((id, { name, category, quantity, unit }) => {
+    const mongoId = basketItems.find(i => i.id === id)?.mongoId;
+
     setBasketItems(prev =>
-      prev.map(item => item.id === id ? { ...item, quantity } : item)
+      prev.map(item => item.id === id ? { ...item, name, category, quantity, unit } : item)
     );
 
-    db.runAsync('UPDATE basket_items SET quantity = ? WHERE id = ?', [quantity, id]);
-
-    basketApi.updateBasketItem(id, { quantity }).catch(err =>
-      console.warn('[BasketContext] MongoDB sync failed on update:', err.message)
+    db.runAsync(
+      'UPDATE basket_items SET name = ?, category = ?, quantity = ?, unit = ? WHERE id = ?',
+      [name, category, quantity, unit, id]
     );
+
+    if (mongoId) {
+      basketApi.updateBasketItem(mongoId, { name, category, quantity, unit }).catch(err =>
+        console.warn('[BasketContext] MongoDB sync failed on update:', err.message)
+      );
+    }
   }, [db]);
 
   // DELETE FROM basket_items WHERE id = ?
   const deleteBasketItem = useCallback((id) => {
-    setBasketItems(prev => prev.filter(item => item.id !== id));
+    const mongoId = basketItems.find(i => i.id === id)?.mongoId;
 
+    setBasketItems(prev => prev.filter(item => item.id !== id));
     db.runAsync('DELETE FROM basket_items WHERE id = ?', [id]);
 
-    basketApi.deleteBasketItem(id).catch(err =>
-      console.warn('[BasketContext] MongoDB sync failed on delete:', err.message)
-    );
-  }, [db]);
+    if (mongoId) {
+      basketApi.deleteBasketItem(mongoId).catch(err =>
+        console.warn('[BasketContext] MongoDB sync failed on delete:', err.message)
+      );
+    }
+  }, [db, basketItems]);
 
   const saveShoppingList = useCallback(async () => {
     return basketApi.saveShoppingList();

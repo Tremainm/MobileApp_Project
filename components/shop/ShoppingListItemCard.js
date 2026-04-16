@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function ShoppingListItemCard({ name, meta, checked, onToggleChecked, onDelete }) {
+export default function ShoppingListItemCard({ name, meta, checked, onToggleChecked, onDelete, onEdit }) {
   return (
     <View style={styles.card}>
       <TouchableOpacity style={styles.checkboxButton} onPress={onToggleChecked} activeOpacity={0.8}>
@@ -16,9 +16,14 @@ export default function ShoppingListItemCard({ name, meta, checked, onToggleChec
         <Text style={[styles.meta, checked && styles.metaChecked]}>{meta}</Text>
       </View>
 
-      <TouchableOpacity style={styles.deleteButton} onPress={onDelete} activeOpacity={0.75}>
-        <Ionicons name="trash-outline" size={24} color={checked ? '#ff7a7a' : '#ff1a1a'} />
-      </TouchableOpacity>
+      <View style={styles.rightActions}>
+        <TouchableOpacity style={styles.editButton} onPress={onEdit} activeOpacity={0.75}>
+          <Ionicons name="create-outline" size={24} color="#377ced" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteButton} onPress={onDelete} activeOpacity={0.75}>
+          <Ionicons name="trash-outline" size={24} color={checked ? '#ff7a7a' : '#ff1a1a'} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -72,7 +77,11 @@ const styles = StyleSheet.create({
   metaChecked: {
     color: '#99a2ad',
   },
-  deleteButton: {
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginLeft: 12,
   },
+  editButton: {},
 });

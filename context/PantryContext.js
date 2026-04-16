@@ -22,11 +22,37 @@ export function PantryProvider({ children }) {
   const db = useSQLiteContext();
   const [items, setItems] = useState([]);
 
-  // SELECT * FROM pantry_items  (runs once on mount)
   useEffect(() => {
-    db.getAllAsync('SELECT * FROM pantry_items').then(rows => {
-      setItems(rows);
-    });
+    let cancelled = false;
+
+    async function syncFromMongoDB() {
+      // 1. Load from SQLite immediately so UI isn't blank while we wait for network
+      const localRows = await db.getAllAsync('SELECT * FROM pantry_items');
+      if (!cancelled) setItems(localRows);
+
+      // 2. Fetch from MongoDB (source of truth)
+      try {
+        const serverItems = await pantryApi.getAllPantryItems();
+
+        // 3. Wipe local table and rewrite from server
+        await db.runAsync('DELETE FROM pantry_items');
+        for (const item of serverItems) {
+          await db.runAsync(
+            'INSERT INTO pantry_items (id, name, category, quantity, unit, location, expiryDate, mongoId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [item._id, item.name, item.category, item.quantity, item.unit, item.location, item.expiryDate ?? null, item._id]
+          );
+        }
+
+        // 4. Update state with the authoritative data
+        const freshRows = await db.getAllAsync('SELECT * FROM pantry_items');
+        if (!cancelled) setItems(freshRows);
+      } catch (err) {
+        console.warn('[PantryContext] MongoDB sync on mount failed, using local data:', err.message);
+      }
+    }
+
+    syncFromMongoDB();
+    return () => { cancelled = true; };
   }, [db]);
 
   // SELECT * FROM pantry_items ORDER BY name
