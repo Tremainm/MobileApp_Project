@@ -48,6 +48,15 @@ export async function initDatabase(db) {
       expiryDate TEXT,
       mongoId TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS basket_items (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      unit TEXT NOT NULL,
+      mongoId TEXT
+    );
   `);
 
   // Only seed on first launch - version flag acts as a migration marker.
