@@ -269,6 +269,8 @@ export default function AddScreen({ navigation, route }) {
 
   function handleClear() {
     if (editingId) {
+      clearForm();
+      navigation.setParams({ item: undefined });
       navigation.goBack();
     } else {
       clearForm();
